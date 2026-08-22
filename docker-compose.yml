@@ -1,0 +1,71 @@
+services:
+  crafty:
+    container_name: crafty
+    image: registry.gitlab.com/crafty-controller/crafty-4:latest
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+      - "25500-25510:25500-25510"
+      - "25565:25565"
+
+    volumes:
+      - ./data/backups:/crafty/backups:Z
+      - ./data/logs:/crafty/logs:Z
+      - ./data/servers:/crafty/servers:Z
+      - ./data/config:/crafty/app/config:Z
+      - ./data/import:/crafty/import:Z
+
+    networks:
+      - minecraft
+
+
+  playit:
+    container_name: playit
+    image: ghcr.io/playit-cloud/playit-agent:1.0
+    restart: unless-stopped
+    network_mode: host
+
+    environment:
+      SECRET_KEY: ${PLAYIT_SECRET_KEY}
+
+  cloudflared:
+    container_name: cloudflared
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+
+    command: tunnel --no-autoupdate run
+
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+
+    networks:
+      - minecraft
+  
+  discord-bot:
+    container_name: minecraft-discord-bot
+    build:
+      context: ./discord-bot
+
+    restart: unless-stopped
+
+    profiles:
+      - discord
+
+    env_file:
+      - .env
+
+    depends_on:
+      - crafty
+
+    networks:
+      - minecraft
+
+    environment:
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
+      WEBHOOK_PORT: 3000
+
+networks:
+  minecraft:
+    driver: bridge
